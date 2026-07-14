@@ -1,0 +1,131 @@
+clc;
+clear;
+close all;
+
+disp('---------------------------------------');
+disp(' SYMBOL RECOGNITION USING MATLAB ');
+disp('---------------------------------------');
+
+% ================= USER INPUT IMAGE ================= %
+
+[file, path] = uigetfile({'*.png;*.jpg;*.bmp'}, 'Select Symbol Image');
+
+if isequal(file,0)
+    disp('No image selected');
+    return;
+end
+
+queryImg = imread(fullfile(path,file));
+figure, imshow(queryImg), title('Input Symbol Image');
+
+% ================= PREPROCESSING ================= %
+
+% Convert RGB to Grayscale
+if size(queryImg,3) == 3
+    grayImg = rgb2gray(queryImg);
+else
+    grayImg = queryImg;
+end
+
+% Resize image to fixed size
+grayImg = imresize(grayImg,[100 100]);
+
+% Convert grayscale to binary image
+bwImg = imbinarize(grayImg);
+
+% Remove unwanted objects / noise
+bwImg = bwareaopen(bwImg,30);
+
+% Fill holes
+bwImg = imfill(bwImg,'holes');
+
+% Invert if needed
+if mean(bwImg(:)) > 0.5
+    bwImg = ~bwImg;
+end
+
+figure, imshow(bwImg), title('Processed Binary Image');
+
+% ================= TEMPLATE DATASET ================= %
+% (Templates are created automatically inside the code
+% just like a stored dataset of fixed-size symbols)
+
+templateNames = ["plus","minus","multiply","divide","triangle","square","circle"];
+templates = cell(length(templateNames),1);
+
+for i = 1:length(templateNames)
+    
+    temp = zeros(100,100);
+    
+    switch templateNames(i)
+        
+        case "plus"
+            temp(45:55,20:80) = 1;
+            temp(20:80,45:55) = 1;
+            
+        case "minus"
+            temp(48:52,20:80) = 1;
+            
+        case "multiply"
+            for k = 1:100
+                temp(k,k) = 1;
+                temp(k,101-k) = 1;
+            end
+            
+        case "divide"
+            temp(48:52,20:80) = 1;
+            temp(25:30,48:52) = 1;
+            temp(70:75,48:52) = 1;
+            
+        case "triangle"
+            temp = poly2mask([50 10 90],[10 90 90],100,100);
+            
+        case "square"
+            temp(20:80,20:80) = 1;
+            temp(30:70,30:70) = 0;
+            
+        case "circle"
+            [x,y] = meshgrid(1:100,1:100);
+            temp((x-50).^2 + (y-50).^2 <= 30^2) = 1;
+            temp((x-50).^2 + (y-50).^2 <= 20^2) = 0;
+            
+    end
+    
+    templates{i} = temp;
+end
+
+% ================= TEMPLATE MATCHING ================= %
+
+bestMatch = 0;
+detectedSymbol = "Unknown";
+
+for i = 1:length(templates)
+    
+    template = templates{i};
+    
+    % Compare pixel values
+    matchPixels = sum(sum(template == bwImg));
+    totalPixels = numel(bwImg);
+    
+    accuracy = (matchPixels / totalPixels) * 100;
+    
+    if accuracy > bestMatch
+        bestMatch = accuracy;
+        detectedSymbol = templateNames(i);
+    end
+    
+end
+
+% ================= RESULT OUTPUT ================= %
+
+fprintf('\nDetected Symbol: %s\n', detectedSymbol);
+fprintf('Matching Accuracy: %.2f %%\n', bestMatch);
+
+figure;
+subplot(1,2,1);
+imshow(bwImg);
+title('Input Symbol (Processed)');
+
+subplot(1,2,2);
+imshow(templates{find(templateNames==detectedSymbol)});
+title(['Matched Template: ' char(detectedSymbol)]);
