@@ -1,0 +1,1 @@
+# Noise-Reduced-Real-Time-OCR-for-Alphanumeric-and-Symbol-Detection-Using-Median-Filtering-in-MATLAB
